@@ -32,7 +32,7 @@ class GradCAM(object):
         self.target_layer = target_layer
         self.outputs_forward = OrderedDict()
         self.outputs_backward = OrderedDict()
-        self._set_hool_func()
+        self._set_hook_func()
 
     def _func_f(self, m, i, o):
         self.outputs_forward[id(m)] = o.data.cpu()
@@ -40,7 +40,7 @@ class GradCAM(object):
     def _func_b(self, m, i, o):
         self.outputs_backward[id(m)] = o[0].cpu()
 
-    def _set_hool_func(self):
+    def _set_hook_func(self):
         for module in self.model.named_modules():
             module[1].register_forward_hook(self._func_f)
             module[1].register_backward_hook(self._func_b)
