@@ -13,6 +13,7 @@ $ python generate.py [image]
 
 ## Examples
 ![](samples/vegetables.jpg)
+
 ||Cauliflower|Cucumber|Broccoli|Head cabbage|Zucchini|
 |:-:|:-:|:-:|:-:|:-:|:-:|
 |**Grad-CAM [1]**|![](results/gcam_cauliflower.png)|![](results/gcam_cucumber.png)|![](results/gcam_broccoli.png)|![](results/gcam_head_cabbage.png)|![](results/gcam_zucchini.png)|
