@@ -50,7 +50,7 @@ class Base(object):
         self.image_ = transform(self.image).unsqueeze(0)
         if cuda:
             self.image_ = self.image_.cuda()
-        self.image_ = Variable(self.image_, requires_grad=True)
+        self.image_ = Variable(self.image_, volatile=False, requires_grad=True)
 
     def forward(self):
         self._output = self.model.forward(self.image_)
@@ -98,22 +98,22 @@ class GradCAM(Base):
             classwise = classwise.cuda()
         self._output.backward(classwise, retain_variables=True)
 
+    def generate_gcam(self):
         self.fmaps = self._retrieve_conv_outputs(
             self._outputs_forward, self.target_layer)
         self.grads = self._retrieve_conv_outputs(
             self._outputs_backward, self.target_layer)
-
-    def generate_gcam(self):
         self._compute_gradient_weights()
 
         gcam = torch.FloatTensor(self.map_size).zero_()
         for fmap, weight in zip(self.fmaps[0], self.weights[0]):
             gcam += fmap * weight.data[0][0]
 
-        return F.relu(Variable(gcam))
+        gcam = F.relu(Variable(gcam))
+
+        return gcam.data.numpy()
 
     def save(self, filename, gcam):
-        gcam = gcam.data.numpy()
         gcam = gcam - np.min(gcam)
         gcam = gcam / np.max(gcam)
 
@@ -144,15 +144,46 @@ class BackProp(Base):
             classwise = classwise.cuda()
         self._output.backward(classwise, retain_variables=True)
 
+    def generate(self):
         self.bp = self._retrieve_conv_outputs(
             self._outputs_backward, self.target_layer)
+        return self.bp.data.numpy()[0].transpose(1, 2, 0)
 
-    def save(self, filename):
-        self.bp = self.bp.data.numpy()[0].transpose(1, 2, 0)
-        self.bp /= np.maximum(-1*self.bp.min(), self.bp.max())
-        self.bp *= 128
-        self.bp += 128
-        cv2.imwrite(filename, self.bp)
+    def save(self, filename, data):
+        data /= np.maximum(-1 * data.min(), data.max())
+        data *= 128
+        data += 128
+        cv2.imwrite(filename, data)
+
+
+class GuidedBackProp(Base):
+
+    def _set_hook_func(self):
+
+        def _func_b(module, grad_in, grad_out):
+            self._outputs_backward[id(module)] = grad_in[0].cpu()
+            if isinstance(module, nn.ReLU):
+                return (F.threshold(grad_in[0], threshold=0.0, value=0.0),)
+
+        for module in self.model.named_modules():
+            module[1].register_backward_hook(_func_b)
+
+    def backward(self, idx):
+        classwise = self._one_hot(idx)
+        if cuda:
+            classwise = classwise.cuda()
+        self._output.backward(classwise, retain_variables=True)
+
+    def generate(self):
+        self.gbp = self._retrieve_conv_outputs(
+            self._outputs_backward, self.target_layer)
+        return self.gbp.data.numpy()[0].transpose(1, 2, 0)
+
+    def save(self, filename, data):
+        data /= np.maximum(-1 * data.min(), data.max())
+        data *= 128
+        data += 128
+        cv2.imwrite(filename, data)
 
 
 if __name__ == '__main__':
@@ -160,7 +191,7 @@ if __name__ == '__main__':
     classes = list()
     with open(file_name) as class_file:
         for line in class_file:
-            classes.append(line.strip().split(' ', 1)[1].split(', ', 1)[0])
+            classes.append(line.strip().split(' ', 1)[1].split(', ', 1)[0].replace(' ', '_'))
     classes = tuple(classes)
 
     print('Loading a model...')
@@ -172,15 +203,16 @@ if __name__ == '__main__':
     ])
 
     print('\nGrad-CAM')
-    cam = GradCAM(model=model, target_layer='features.36', n_class=1000)
-    cam.load_image(sys.argv[1], transform)
-    cam.forward()
+    gcam = GradCAM(model=model, target_layer='features.36', n_class=1000)
+    gcam.load_image(sys.argv[1], transform)
+    gcam.forward()
 
     for i in range(0, 5):
-        print('{:.5f}\t{}'.format(cam.prob[i], classes[cam.idx[i]]))
-        cam.backward(idx=cam.idx[i])
-        gcam = cam.generate_gcam()
-        cam.save('results/gcam_{}.png'.format(classes[cam.idx[i]]), gcam)
+        print('{:.5f}\t{}'.format(gcam.prob[i], classes[gcam.idx[i]]))
+        gcam.backward(idx=gcam.idx[i])
+        gcam_data = gcam.generate_gcam()
+        gcam.save(
+            'results/gcam_{}.png'.format(classes[gcam.idx[i]]), gcam_data)
 
     print('\nBackpropagation')
     bp = BackProp(model=model, target_layer='features.0', n_class=1000)
@@ -190,4 +222,27 @@ if __name__ == '__main__':
     for i in range(0, 5):
         print('{:.5f}\t{}'.format(bp.prob[i], classes[bp.idx[i]]))
         bp.backward(idx=bp.idx[i])
-        bp.save('results/bp_{}.png'.format(classes[bp.idx[i]]))
+        bp_data = bp.generate()
+        bp.save('results/bp_{}.png'.format(classes[bp.idx[i]]), bp_data)
+
+    print('\nGuided Backpropagation')
+    gbp = GuidedBackProp(model=model, target_layer='features.0', n_class=1000)
+    gbp.load_image(sys.argv[1], transform)
+    gbp.forward()
+
+    for i in range(0, 5):
+        print('{:.5f}\t{}'.format(gbp.prob[i], classes[gbp.idx[i]]))
+        gcam.backward(idx=gcam.idx[i])
+        gcam_data = gcam.generate_gcam()
+
+        gbp.backward(idx=gbp.idx[i])
+        gbp_data = gbp.generate()
+        gbp.save('results/gbp_{}.png'.format(classes[gbp.idx[i]]), gbp_data.copy())
+
+        gcam_data = gcam_data - np.min(gcam_data)
+        gcam_data = gcam_data / np.max(gcam_data)
+        gcam_data = cv2.resize(gcam_data, (224, 224))
+        gcam_data = cv2.cvtColor(gcam_data, cv2.COLOR_GRAY2BGR)
+
+        ggcam_data = gbp_data * gcam_data
+        gbp.save('results/ggcam_{}.png'.format(classes[gbp.idx[i]]), ggcam_data)
