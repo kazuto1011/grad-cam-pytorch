@@ -8,7 +8,7 @@ PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping)
 
 ## Usage
 ```bash
-$ python generate.py [image]
+$ python generate.py --image samples/vegetables.jpg
 ```
 
 ## Examples
