@@ -12,14 +12,14 @@ $ python generate.py --image samples/vegetables.jpg
 ```
 
 ## Examples
-![](samples/vegetables.jpg)
+![](samples/cat_dog.png)
 
-||Cauliflower|Cucumber|Broccoli|Head cabbage|Zucchini|
-|:-:|:-:|:-:|:-:|:-:|:-:|
-|**Grad-CAM [1]**|![](results/gcam_cauliflower.png)|![](results/gcam_cucumber.png)|![](results/gcam_broccoli.png)|![](results/gcam_head_cabbage.png)|![](results/gcam_zucchini.png)|
-|Backpropogation|![](results/bp_cauliflower.png)|![](results/bp_cucumber.png)|![](results/bp_broccoli.png)|![](results/bp_head_cabbage.png)|![](results/bp_zucchini.png)|
-|Guided Backpropagation [2]|![](results/gbp_cauliflower.png)|![](results/gbp_cucumber.png)|![](results/gbp_broccoli.png)|![](results/gbp_head_cabbage.png)|![](results/gbp_zucchini.png)|
-|**Guided Grad-CAM [1]**|![](results/ggcam_cauliflower.png)|![](results/ggcam_cucumber.png)|![](results/ggcam_broccoli.png)|![](results/ggcam_head_cabbage.png)|![](results/ggcam_zucchini.png)|
+||bull mastiff|tabby|
+|:-:|:-:|:-:|
+|**Grad-CAM [1]**|![](results/gcam_bull_mastiff.png)|![](results/gcam_tabby.png)|
+|Backpropogation|![](results/bp_bull_mastiff.png)|![](results/bp_tabby.png)|
+|Guided Backpropagation [2]|![](results/gbp_bull_mastiff.png)|![](results/gbp_tabby.png)|
+|**Guided Grad-CAM [1]**|![](results/ggcam_bull_mastiff.png)|![](results/ggcam_tabby.png)|
 
 ## References
 \[1\] R. R. Selvaraju, A. Das, R. Vedantam, M. Cogswell, D. Parikh, and D. Batra. "Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization". arXiv, 2016<br>

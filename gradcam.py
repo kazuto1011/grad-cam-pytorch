@@ -56,11 +56,9 @@ class PropBase(object):
     def backward(self, idx):
         self.model.zero_grad()
         one_hot = self.encode_one_hot(idx)
-        one_hot = Variable(one_hot, requires_grad=True)
         if self.cuda:
             one_hot = one_hot.cuda()
-        one_hot = torch.sum(one_hot * self.preds)
-        one_hot.backward(retain_variables=True)
+        self.preds.backward(gradient=one_hot, retain_variables=True)
 
     def get_conv_outputs(self, outputs, target_layer):
         for key, value in outputs.items():

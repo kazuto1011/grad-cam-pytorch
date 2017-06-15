@@ -29,7 +29,6 @@ if __name__ == '__main__':
     with open(file_name) as class_file:
         for line in class_file:
             classes.append(line.strip().split(' ', 1)[1].split(', ', 1)[0].replace(' ', '_'))
-    classes = tuple(classes)
 
     print('Loading a model...')
     model = torchvision.models.vgg19(pretrained=True)
