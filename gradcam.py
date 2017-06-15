@@ -49,15 +49,18 @@ class PropBase(object):
         self.image_ = Variable(self.image_, volatile=False, requires_grad=True)
 
     def forward(self):
-        self.probs = F.softmax(self.model.forward(self.image_))
+        self.preds = self.model.forward(self.image_)
+        self.probs = F.softmax(self.preds)
         self.prob, self.idx = self.probs.data.squeeze().sort(0, True)
 
     def backward(self, idx):
         self.model.zero_grad()
         one_hot = self.encode_one_hot(idx)
+        one_hot = Variable(one_hot, requires_grad=True)
         if self.cuda:
             one_hot = one_hot.cuda()
-        self.probs.backward(one_hot, retain_variables=True)
+        one_hot = torch.sum(one_hot * self.preds)
+        one_hot.backward(retain_variables=True)
 
     def get_conv_outputs(self, outputs, target_layer):
         for key, value in outputs.items():
