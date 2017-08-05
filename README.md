@@ -16,10 +16,10 @@ $ python generate.py --image samples/vegetables.jpg
 
 ||bull mastiff|tabby|
 |:-:|:-:|:-:|
-|**Grad-CAM [1]**|![](results/gcam_bull_mastiff.png)|![](results/gcam_tabby.png)|
-|Backpropogation|![](results/bp_bull_mastiff.png)|![](results/bp_tabby.png)|
-|Guided Backpropagation [2]|![](results/gbp_bull_mastiff.png)|![](results/gbp_tabby.png)|
-|**Guided Grad-CAM [1]**|![](results/ggcam_bull_mastiff.png)|![](results/ggcam_tabby.png)|
+|**Grad-CAM [1]**|![](results/bull_mastiff_gcam.png)|![](results/tabby_gcam.png)|
+|Backpropogation|![](results/bull_mastiff_bp.png)|![](results/tabby_bp.png)|
+|Guided Backpropagation [2]|![](results/bull_mastiff_gbp.png)|![](results/tabby_gbp.png)|
+|**Guided Grad-CAM [1]**|![](results/bull_mastiff_ggcam.png)|![](results/tabby_ggcam.png)|
 
 ## References
 \[1\] R. R. Selvaraju, A. Das, R. Vedantam, M. Cogswell, D. Parikh, and D. Batra. "Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization". arXiv, 2016<br>

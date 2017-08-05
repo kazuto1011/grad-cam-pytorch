@@ -11,24 +11,21 @@ import argparse
 
 import cv2
 import numpy as np
-
 import torchvision
-from gradcam import BackProp, GradCAM, GuidedBackProp
 from torchvision import transforms
 
-if __name__ == '__main__':
+from gradcam import BackPropagation, GradCAM, GuidedBackPropagation
 
-    parser = argparse.ArgumentParser(description='Grad-CAM visualization')
-    parser.add_argument('--cuda', type=bool, default=True)
-    parser.add_argument('--image', type=str, required=True)
-    args = parser.parse_args()
+
+def main(args):
 
     # Load the synset words
     file_name = 'synset_words.txt'
     classes = list()
     with open(file_name) as class_file:
         for line in class_file:
-            classes.append(line.strip().split(' ', 1)[1].split(', ', 1)[0].replace(' ', '_'))
+            classes.append(line.strip().split(' ', 1)[
+                           1].split(', ', 1)[0].replace(' ', '_'))
 
     print('Loading a model...')
     model = torchvision.models.vgg19(pretrained=True)
@@ -45,45 +42,58 @@ if __name__ == '__main__':
     gcam.forward()
 
     for i in range(0, 5):
-        print('{:.5f}\t{}'.format(gcam.prob[i], classes[gcam.idx[i]]))
+        print('\t{:.5f}\t{}'.format(gcam.prob[i], classes[gcam.idx[i]]))
         gcam.backward(idx=gcam.idx[i])
-        gcam_data = gcam.generate()
-        gcam.save(
-            'results/gcam_{}.png'.format(classes[gcam.idx[i]]), gcam_data)
+        cls_name = classes[gcam.idx[i]]
+        output = gcam.generate()
+        gcam.save('results/{}_gcam.png'.format(cls_name), output)
 
     print('\nBackpropagation')
-    bp = BackProp(model=model, target_layer='features.0',
-                  n_class=1000, cuda=args.cuda)
+    bp = BackPropagation(model=model, target_layer='features.0',
+                         n_class=1000, cuda=args.cuda)
     bp.load_image(args.image, transform)
     bp.forward()
 
     for i in range(0, 5):
-        print('{:.5f}\t{}'.format(bp.prob[i], classes[bp.idx[i]]))
+        print('\t{:.5f}\t{}'.format(bp.prob[i], classes[bp.idx[i]]))
         bp.backward(idx=bp.idx[i])
-        bp_data = bp.generate()
-        bp.save('results/bp_{}.png'.format(classes[bp.idx[i]]), bp_data)
+        cls_name = classes[bp.idx[i]]
+        output = bp.generate()
+        bp.save('results/{}_bp.png'.format(cls_name), output)
 
     print('\nGuided Backpropagation')
-    gbp = GuidedBackProp(model=model, target_layer='features.0',
-                         n_class=1000, cuda=args.cuda)
+    gbp = GuidedBackPropagation(model=model, target_layer='features.0',
+                                n_class=1000, cuda=args.cuda)
     gbp.load_image(args.image, transform)
     gbp.forward()
 
     for i in range(0, 5):
-        print('{:.5f}\t{}'.format(gbp.prob[i], classes[gbp.idx[i]]))
-        gcam.backward(idx=gcam.idx[i])
-        gcam_data = gcam.generate()
+        cls_idx = gcam.idx[i]
+        cls_name = classes[cls_idx]
+        print('\t{:.5f}\t{}'.format(gbp.prob[i], cls_name))
 
-        gbp.backward(idx=gbp.idx[i])
-        gbp_data = gbp.generate()
-        gbp.save(
-            'results/gbp_{}.png'.format(classes[gbp.idx[i]]), gbp_data.copy())
+        gcam.backward(idx=cls_idx)
+        output_gcam = gcam.generate()
 
-        gcam_data = gcam_data - np.min(gcam_data)
-        gcam_data = gcam_data / np.max(gcam_data)
-        gcam_data = cv2.resize(gcam_data, (224, 224))
-        gcam_data = cv2.cvtColor(gcam_data, cv2.COLOR_GRAY2BGR)
+        gbp.backward(idx=cls_idx)
+        output_gbp = gbp.generate()
 
-        ggcam_data = gbp_data * gcam_data
-        gbp.save(
-            'results/ggcam_{}.png'.format(classes[gbp.idx[i]]), ggcam_data)
+        output_gcam -= output_gcam.min()
+        output_gcam /= output_gcam.max()
+        output_gcam = cv2.resize(output_gcam, (224, 224))
+        output_gcam = cv2.cvtColor(output_gcam, cv2.COLOR_GRAY2BGR)
+
+        output = output_gbp * output_gcam
+
+        gbp.save('results/{}_gbp.png'.format(cls_name), output_gbp)
+        gbp.save('results/{}_ggcam.png'.format(cls_name), output)
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Grad-CAM visualization')
+    parser.add_argument('--cuda', type=bool, default=True)
+    parser.add_argument('--image', type=str, required=True)
+    args = parser.parse_args()
+
+    main(args)
