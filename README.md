@@ -1,6 +1,6 @@
 # Grad-CAM with PyTorch
 
-PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping) [1]](https://arxiv.org/pdf/1610.02391v1.pdf). Grad-CAM localizes and highlights the discriminative regions that Convolutional Neural Networks-based models activate to predict visual concepts. This code contains only an imeplementation for the VGG-19 image classification models.
+PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping) [1]](https://arxiv.org/pdf/1610.02391v1.pdf). Grad-CAM localizes and highlights the discriminative regions that Convolutional Neural Networks-based models activate to predict visual concepts. This code contains only an imeplementation for the ResNet-152 image classification models.
 
 ## Dependencies
 * Python 2.7
@@ -8,7 +8,7 @@ PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping)
 
 ## Usage
 ```bash
-$ python generate.py --image samples/vegetables.jpg
+$ python main.py --image samples/cat_dog.jpg
 ```
 
 ## Examples

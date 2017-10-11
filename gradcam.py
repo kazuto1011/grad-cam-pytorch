@@ -19,7 +19,7 @@ from torch.nn import functional as F
 
 class PropagatationBase(object):
 
-    def __init__(self, model, target_layer, n_class, cuda=True):
+    def __init__(self, model, target_layer, n_class, cuda):
         self.model = model
         self.model.eval()
         self.cuda = cuda
