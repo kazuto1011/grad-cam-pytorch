@@ -17,17 +17,15 @@ from torch.autograd import Variable
 from torch.nn import functional as F
 
 
-class PropagatationBase(object):
+class PropagationBase(object):
 
-    def __init__(self, model, target_layer, n_class, cuda):
+    def __init__(self, model, target_layer, cuda):
         self.model = model
         self.model.eval()
         self.cuda = cuda
         if self.cuda:
             self.model.cuda()
         self.target_layer = target_layer
-        self.n_class = n_class
-        self.probs = None
         self.all_fmaps = OrderedDict()
         self.all_grads = OrderedDict()
         self.set_hook_func()
@@ -36,28 +34,26 @@ class PropagatationBase(object):
         raise NotImplementedError
 
     def encode_one_hot(self, idx):
-        one_hot = torch.FloatTensor(1, self.n_class).zero_()
+        one_hot = torch.FloatTensor(1, self.preds.size()[-1]).zero_()
         one_hot[0][idx] = 1.0
-        return one_hot
+        return one_hot.cuda() if self.cuda else one_hot
 
     def load_image(self, filename, transform):
         self.raw_image = cv2.imread(filename)[:, :, ::-1]
         self.raw_image = cv2.resize(self.raw_image, (224, 224))
-        self.image = transform(self.raw_image).unsqueeze(0)
-        if self.cuda:
-            self.image = self.image.cuda()
-        self.image = Variable(self.image, volatile=False, requires_grad=True)
+        image = transform(self.raw_image).unsqueeze(0)
+        image = image.cuda() if self.cuda else image
+        self.image = Variable(image, volatile=False, requires_grad=True)
 
     def forward(self):
         self.preds = self.model.forward(self.image)
         self.probs = F.softmax(self.preds)[0]
         self.prob, self.idx = self.probs.data.sort(0, True)
+        return self.prob, self.idx
 
     def backward(self, idx):
         self.model.zero_grad()
         one_hot = self.encode_one_hot(idx)
-        if self.cuda:
-            one_hot = one_hot.cuda()
         self.preds.backward(gradient=one_hot, retain_graph=True)
 
     def find(self, outputs, target_layer):
@@ -69,7 +65,7 @@ class PropagatationBase(object):
         raise ValueError('invalid layer name: {}'.format(target_layer))
 
 
-class GradCAM(PropagatationBase):
+class GradCAM(PropagationBase):
 
     def set_hook_func(self):
 
@@ -117,7 +113,7 @@ class GradCAM(PropagatationBase):
         cv2.imwrite(filename, gcam)
 
 
-class BackPropagation(PropagatationBase):
+class BackPropagation(PropagationBase):
 
     def set_hook_func(self):
 
@@ -147,7 +143,7 @@ class GuidedBackPropagation(BackPropagation):
 
             # Cut off negative gradients
             if isinstance(module, nn.ReLU):
-                return (F.threshold(grad_in[0], threshold=0.0, value=0.0),)
+                return (torch.clamp(grad_in[0], min=0.0),)
 
         for module in self.model.named_modules():
             module[1].register_backward_hook(func_b)

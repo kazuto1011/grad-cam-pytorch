@@ -5,21 +5,23 @@ PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping)
 ## Dependencies
 * Python 2.7
 * PyTorch
+* torchvision
 
 ## Usage
 ```bash
-$ python main.py --image samples/cat_dog.jpg
+$ python main.py --image samples/cat_dog.jpg [--no-cuda]
 ```
 
 ## Examples
 ![](samples/cat_dog.png)
 
-||bull mastiff|tabby|
-|:-:|:-:|:-:|
-|**Grad-CAM [1]**|![](results/bull_mastiff_gcam.png)|![](results/tabby_gcam.png)|
-|Backpropogation|![](results/bull_mastiff_bp.png)|![](results/tabby_bp.png)|
-|Guided Backpropagation [2]|![](results/bull_mastiff_gbp.png)|![](results/tabby_gbp.png)|
-|**Guided Grad-CAM [1]**|![](results/bull_mastiff_ggcam.png)|![](results/tabby_ggcam.png)|
+||bull mastiff|tiger cat|boxer|
+|:-:|:-:|:-:|:-:|
+|Probability|0.54285|0.19302|0.10428|
+|**Grad-CAM [1]**|![](results/bull_mastiff_gcam.png)|![](results/tiger_cat_gcam.png)|![](results/boxer_gcam.png)|
+|Vanilla Backpropogation|![](results/bull_mastiff_bp.png)|![](results/tiger_cat_bp.png)|![](results/boxer_bp.png)|
+|Guided Backpropagation [2]|![](results/bull_mastiff_gbp.png)|![](results/tiger_cat_gbp.png)|![](results/boxer_gbp.png)|
+|**Guided Grad-CAM [1]**|![](results/bull_mastiff_ggcam.png)|![](results/tiger_cat_ggcam.png)|![](results/boxer_ggcam.png)|
 
 ## References
 \[1\] R. R. Selvaraju, A. Das, R. Vedantam, M. Cogswell, D. Parikh, and D. Batra. "Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization". arXiv, 2016<br>
