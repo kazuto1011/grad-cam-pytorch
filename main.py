@@ -9,95 +9,107 @@ from __future__ import print_function
 
 import argparse
 
+import click
 import cv2
 import numpy as np
-import torchvision
-from torchvision import transforms
+import torch
+from torch.autograd import Variable
 
 from grad_cam import BackPropagation, GradCAM, GuidedBackPropagation
+from torchvision import models, transforms
+
+model_names = sorted(name for name in models.__dict__
+                     if name.islower() and not name.startswith("__")
+                     and callable(models.__dict__[name]))
 
 
-def main(args):
+@click.command()
+@click.option('--image-path', type=str, required=True)
+@click.option('--arch', type=click.Choice(model_names), required=True)
+@click.option('--topk', type=int, default=3)
+@click.option('--cuda/--no-cuda', default=True)
+def main(image_path, arch, topk, cuda):
 
-    # Load the synset words
-    idx2cls = list()
+    CONFIG = {
+        'resnet152': {
+            'target_layer': 'layer4.2',
+            'input_size': 224
+        },
+        'vgg19': {
+            'target_layer': 'features.35',
+            'input_size': 224
+        },
+        'inception_v3': {
+            'target_layer': 'Mixed_7c',
+            'input_size': 299
+        },
+    }.get(arch)
+
+    cuda = cuda and torch.cuda.is_available()
+
+    # Synset words
+    classes = list()
     with open('samples/synset_words.txt') as lines:
         for line in lines:
             line = line.strip().split(' ', 1)[1]
             line = line.split(', ', 1)[0].replace(' ', '_')
-            idx2cls.append(line)
+            classes.append(line)
 
-    print('Loading a model...')
-    model = torchvision.models.resnet152(pretrained=True)
+    # Model
+    model = models.__dict__[arch](pretrained=True)
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225])
     ])
 
-    print('\nGrad-CAM')
-    gcam = GradCAM(model=model,
-                   target_layer='layer4.2',
-                   cuda=args.cuda)
-    gcam.load_image(args.image, transform)
-    gcam.forward()
+    # Image
+    raw_image = cv2.imread(image_path)[:, :, ::-1]
+    raw_image = cv2.resize(raw_image, (CONFIG['input_size'], ) * 2)
+    image = transform(raw_image).unsqueeze(0)
+    image = Variable(image, volatile=False, requires_grad=True)
 
-    for i in range(0, 3):
-        gcam.backward(idx=gcam.idx[i])
-        cls_name = idx2cls[gcam.idx[i]]
-        output = gcam.generate()
-        print('\t{:.5f}\t{}'.format(gcam.prob[i], cls_name))
-        gcam.save('results/{}_gcam.png'.format(cls_name), output)
+    if cuda:
+        model.cuda()
+        image = image.cuda()
 
-    print('\nVanilla Backpropagation')
-    bp = BackPropagation(model=model,
-                         target_layer='conv1',
-                         cuda=args.cuda)
-    bp.load_image(args.image, transform)
-    bp.forward()
+    print('1. Grad-CAM')
+    gcam = GradCAM(model=model, cuda=cuda)
+    probs, idx = gcam.forward(image)
 
-    for i in range(0, 3):
-        bp.backward(idx=bp.idx[i])
-        cls_name = idx2cls[bp.idx[i]]
+    for i in range(0, topk):
+        gcam.backward(idx=idx[i])
+        output = gcam.generate(target_layer=CONFIG['target_layer'])
+
+        gcam.save('results/{}_gcam_{}.png'.format(classes[idx[i]], arch), output, raw_image)  # NOQA
+        print('\t{:.5f}\t{}'.format(probs[i], classes[idx[i]]))
+
+    print('2. Vanilla Backpropagation')
+    bp = BackPropagation(model=model, cuda=cuda)
+    probs, idx = bp.forward(image)
+
+    for i in range(0, topk):
+        bp.backward(idx=idx[i])
         output = bp.generate()
-        print('\t{:.5f}\t{}'.format(bp.prob[i], cls_name))
-        bp.save('results/{}_bp.png'.format(cls_name), output)
+        bp.save('results/{}_bp_{}.png'.format(classes[idx[i]], arch), output)
+        print('\t{:.5f}\t{}'.format(probs[i], classes[idx[i]]))
 
-    print('\nGuided Backpropagation')
-    gbp = GuidedBackPropagation(model=model,
-                                target_layer='conv1',
-                                cuda=args.cuda)
-    gbp.load_image(args.image, transform)
-    gbp.forward()
+    print('3. Guided Backpropagation/Grad-CAM')
+    gbp = GuidedBackPropagation(model=model, cuda=cuda)
+    probs, idx = gbp.forward(image)
 
-    for i in range(0, 3):
-        cls_idx = gcam.idx[i]
-        cls_name = idx2cls[cls_idx]
+    for i in range(0, topk):
+        gcam.backward(idx=idx[i])
+        region = gcam.generate(target_layer=CONFIG['target_layer'])
 
-        gcam.backward(idx=cls_idx)
-        output_gcam = gcam.generate()
+        gbp.backward(idx=idx[i])
+        feature = gbp.generate()
 
-        gbp.backward(idx=cls_idx)
-        output_gbp = gbp.generate()
-
-        output_gcam -= output_gcam.min()
-        output_gcam /= output_gcam.max()
-        output_gcam = cv2.resize(output_gcam, (224, 224))
-        output_gcam = cv2.cvtColor(output_gcam, cv2.COLOR_GRAY2BGR)
-
-        output = output_gbp * output_gcam
-
-        print('\t{:.5f}\t{}'.format(gbp.prob[i], cls_name))
-        gbp.save('results/{}_gbp.png'.format(cls_name), output_gbp)
-        gbp.save('results/{}_ggcam.png'.format(cls_name), output)
+        output = feature * region[:, :, np.newaxis]
+        gbp.save('results/{}_gbp_{}.png'.format(classes[idx[i]], arch), feature)  # NOQA
+        gbp.save('results/{}_ggcam_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
+        print('\t{:.5f}\t{}'.format(probs[i], classes[idx[i]]))
 
 
 if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser(description='Grad-CAM visualization')
-    parser.add_argument('--no-cuda', action='store_true', default=False)
-    parser.add_argument('--image', type=str, required=True)
-    args = parser.parse_args()
-    args.cuda = not args.no_cuda and torch.cuda.is_available()
-
-    main(args)
+    main()
