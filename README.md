@@ -1,12 +1,13 @@
 # Grad-CAM with PyTorch
 
-PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping) [1]](https://arxiv.org/pdf/1610.02391v1.pdf). Grad-CAM localizes and highlights discriminative regions that Convolutional Neural Networks-based models activate to predict visual concepts. This repo contains only an implementation for image classification models.
+PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping) [1]](https://arxiv.org/pdf/1610.02391v1.pdf). Grad-CAM localizes and highlights discriminative regions that convolutional neural networks-based models activate to predict visual concepts. This repo contains only an implementation for image classification models.
 
 ## Dependencies
 * Python 2.7
 * PyTorch 0.2.0
 * torchvision
 * click
+* opencv
 
 ## Usage
 
@@ -24,6 +25,9 @@ The command above generates, for top *k* classes:
 * Guided backproped gradients
 * Grad-CAM
 * Guided Grad-CAM
+
+The guided-* do not support F.relu but only nn.ReLU in this codes.
+For instance, off-the-shelf *inception_v3* cannot cut off negative gradients during backward operation (#2).
 
 ## Examples
 

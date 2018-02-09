@@ -7,8 +7,6 @@
 
 from __future__ import print_function
 
-import argparse
-
 import click
 import cv2
 import numpy as np
@@ -74,18 +72,17 @@ def main(image_path, arch, topk, cuda):
         image = image.cuda()
 
     print('1. Grad-CAM')
-    gcam = GradCAM(model=model, cuda=cuda)
+    gcam = GradCAM(model=model)
     probs, idx = gcam.forward(image)
 
     for i in range(0, topk):
         gcam.backward(idx=idx[i])
         output = gcam.generate(target_layer=CONFIG['target_layer'])
-
         gcam.save('results/{}_gcam_{}.png'.format(classes[idx[i]], arch), output, raw_image)  # NOQA
         print('\t{:.5f}\t{}'.format(probs[i], classes[idx[i]]))
 
     print('2. Vanilla Backpropagation')
-    bp = BackPropagation(model=model, cuda=cuda)
+    bp = BackPropagation(model=model)
     probs, idx = bp.forward(image)
 
     for i in range(0, topk):
@@ -95,7 +92,7 @@ def main(image_path, arch, topk, cuda):
         print('\t{:.5f}\t{}'.format(probs[i], classes[idx[i]]))
 
     print('3. Guided Backpropagation/Grad-CAM')
-    gbp = GuidedBackPropagation(model=model, cuda=cuda)
+    gbp = GuidedBackPropagation(model=model)
     probs, idx = gbp.forward(image)
 
     for i in range(0, topk):
