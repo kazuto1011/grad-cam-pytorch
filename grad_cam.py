@@ -34,9 +34,6 @@ class PropagationBase(object):
         one_hot[0][idx] = 1.0
         return one_hot.cuda() if self.cuda else one_hot
 
-    def _to_np(self, tensor):
-        return tensor.data.cpu().numpy()
-
     def forward(self, image):
         self.image = image
         self.model.zero_grad()
@@ -61,7 +58,7 @@ class BackPropagation(PropagationBase):
             module[1].register_backward_hook(func_b)
 
     def generate(self):
-        output = self._to_np(self.image.grad)[0]
+        output = self.image.grad.data.cpu().numpy()[0]
         return output.transpose(1, 2, 0)
 
     def save(self, filename, data):

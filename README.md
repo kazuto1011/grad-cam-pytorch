@@ -45,10 +45,10 @@ For instance, off-the-shelf *inception_v3* cannot cut off negative gradients dur
 
 Grad-CAM visualization of *bull mastiff*
 
-|Model|resnet152|vgg19|inception_v3|
-|:-:|:-:|:-:|:-:|
-|Input|224x224|224x224|299x299|
-|Grad-CAM [1]|![](results/bull_mastiff_gcam_resnet152.png)|![](results/bull_mastiff_gcam_vgg19.png)|![](results/bull_mastiff_gcam_inception_v3.png)|
+|Model|resnet152|vgg19|vgg19_bn|inception_v3|
+|:-:|:-:|:-:|:-:|:-:|
+|Input|224x224|224x224|224x224|299x299|
+|Grad-CAM [1]|![](results/bull_mastiff_gcam_resnet152.png)|![](results/bull_mastiff_gcam_vgg19.png)|![](results/bull_mastiff_gcam_vgg19_bn.png)|![](results/bull_mastiff_gcam_inception_v3.png)|
 
 ## References
 
