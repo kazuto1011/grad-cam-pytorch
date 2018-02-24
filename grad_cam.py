@@ -7,27 +7,20 @@
 
 from collections import OrderedDict
 
-import cv2
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
 
-class PropagationBase(object):
+class _PropagationBase(object):
 
     def __init__(self, model):
-        super(PropagationBase, self).__init__()
+        super(_PropagationBase, self).__init__()
+        self.cuda = True if next(model.parameters()).is_cuda else False
         self.model = model
         self.model.eval()
-        self.cuda = True if next(model.parameters()).is_cuda else False
-        self.all_fmaps = OrderedDict()
-        self.all_grads = OrderedDict()
-        self._set_hook_func()
         self.image = None
-
-    def _set_hook_func(self):
-        raise NotImplementedError
 
     def _encode_one_hot(self, idx):
         one_hot = torch.FloatTensor(1, self.preds.size()[-1]).zero_()
@@ -47,33 +40,19 @@ class PropagationBase(object):
         self.preds.backward(gradient=one_hot, retain_graph=True)
 
 
-class BackPropagation(PropagationBase):
-
-    def _set_hook_func(self):
-
-        def func_b(module, grad_in, grad_out):
-            self.all_grads[id(module)] = grad_in[0].cpu()
-
-        for module in self.model.named_modules():
-            module[1].register_backward_hook(func_b)
+class BackPropagation(_PropagationBase):
 
     def generate(self):
         output = self.image.grad.data.cpu().numpy()[0]
         return output.transpose(1, 2, 0)
 
-    def save(self, filename, data):
-        abs_max = np.maximum(-1 * data.min(), data.max())
-        data = data / abs_max * 127.0 + 127.0
-        cv2.imwrite(filename, np.uint8(data))
-
 
 class GuidedBackPropagation(BackPropagation):
 
-    def _set_hook_func(self):
+    def __init__(self, model):
+        super(GuidedBackPropagation, self).__init__(model)
 
         def func_b(module, grad_in, grad_out):
-            self.all_grads[id(module)] = grad_in[0].cpu()
-
             # Cut off negative gradients
             if isinstance(module, nn.ReLU):
                 return (torch.clamp(grad_in[0], min=0.0),)
@@ -82,9 +61,12 @@ class GuidedBackPropagation(BackPropagation):
             module[1].register_backward_hook(func_b)
 
 
-class GradCAM(PropagationBase):
+class GradCAM(_PropagationBase):
 
-    def _set_hook_func(self):
+    def __init__(self, model):
+        super(GradCAM, self).__init__(model)
+        self.all_fmaps = OrderedDict()
+        self.all_grads = OrderedDict()
 
         def func_f(module, input, output):
             self.all_fmaps[id(module)] = output.data.cpu()
@@ -122,13 +104,5 @@ class GradCAM(PropagationBase):
 
         gcam -= gcam.min()
         gcam /= gcam.max()
-        _, _, h, w = self.image.shape
-        gcam = cv2.resize(gcam.cpu().numpy(), (w, h))
 
-        return gcam
-
-    def save(self, filename, gcam, raw_image):
-        gcam = cv2.applyColorMap(np.uint8(gcam * 255.0), cv2.COLORMAP_JET)
-        gcam = gcam.astype(np.float) + raw_image.astype(np.float)
-        gcam = gcam / gcam.max() * 255.0
-        cv2.imwrite(filename, np.uint8(gcam))
+        return gcam.cpu().numpy()

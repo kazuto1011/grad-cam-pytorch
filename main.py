@@ -25,6 +25,21 @@ def to_var(image):
     return Variable(image.unsqueeze(0), volatile=False, requires_grad=True)
 
 
+def save_gradient(filename, data):
+    abs_max = np.maximum(-1 * data.min(), data.max())
+    data = data / abs_max * 127.0 + 127.0
+    cv2.imwrite(filename, np.uint8(data))
+
+
+def save_gradcam(filename, gcam, raw_image):
+    h, w, _ = raw_image.shape
+    gcam = cv2.resize(gcam, (w, h))
+    gcam = cv2.applyColorMap(np.uint8(gcam * 255.0), cv2.COLORMAP_JET)
+    gcam = gcam.astype(np.float) + raw_image.astype(np.float)
+    gcam = gcam / gcam.max() * 255.0
+    cv2.imwrite(filename, np.uint8(gcam))
+
+
 @click.command()
 @click.option('--image-path', type=str, required=True)
 @click.option('--arch', type=click.Choice(model_names), required=True)
@@ -49,6 +64,10 @@ def main(image_path, arch, topk, cuda):
             'target_layer': 'Mixed_7c',
             'input_size': 299
         },
+        'densenet201': {
+            'target_layer': 'features.denseblock4',
+            'input_size': 224
+        },
         # Add your model
     }.get(arch)
 
@@ -72,13 +91,12 @@ def main(image_path, arch, topk, cuda):
     model = models.__dict__[arch](pretrained=True)
 
     # Image
-    raw_image = cv2.imread(image_path)[:, :, ::-1]
+    raw_image = cv2.imread(image_path)[..., ::-1]
     raw_image = cv2.resize(raw_image, (CONFIG['input_size'], ) * 2)
     image = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
     ])(raw_image)
 
     if cuda:
@@ -92,7 +110,8 @@ def main(image_path, arch, topk, cuda):
     for i in range(0, topk):
         gcam.backward(idx=idx[i])
         output = gcam.generate(target_layer=CONFIG['target_layer'])
-        gcam.save('results/{}_gcam_{}.png'.format(classes[idx[i]], arch), output, raw_image)  # NOQA
+
+        save_gradcam('results/{}_gcam_{}.png'.format(classes[idx[i]], arch), output, raw_image)  # NOQA
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
     print('Vanilla Backpropagation')
@@ -102,7 +121,8 @@ def main(image_path, arch, topk, cuda):
     for i in range(0, topk):
         bp.backward(idx=idx[i])
         output = bp.generate()
-        bp.save('results/{}_bp_{}.png'.format(classes[idx[i]], arch), output)
+
+        save_gradient('results/{}_bp_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
     print('Guided Backpropagation/Guided Grad-CAM')
@@ -116,9 +136,12 @@ def main(image_path, arch, topk, cuda):
         gbp.backward(idx=idx[i])
         feature = gbp.generate()
 
-        output = feature * region[:, :, np.newaxis]
-        gbp.save('results/{}_gbp_{}.png'.format(classes[idx[i]], arch), feature)  # NOQA
-        gbp.save('results/{}_ggcam_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
+        h, w, _ = feature.shape
+        region = cv2.resize(region, (w, h))[..., np.newaxis]
+        output = feature * region
+
+        save_gradient('results/{}_gbp_{}.png'.format(classes[idx[i]], arch), feature)  # NOQA
+        save_gradient('results/{}_ggcam_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
 
