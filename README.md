@@ -15,7 +15,7 @@ PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping)
 python main.py --help
 ```
 
-* ```--image_path```: a path to an image (required)
+* ```--image-path```: a path to an image (required)
 * ```--arch```: a model name from ```torchvision.models```, e.g., 'resnet152' (required)
 * ```--topk```: the number of classes to generate (default: 3)
 * ```--cuda/--no-cuda```: GPU or CPU
@@ -23,6 +23,7 @@ python main.py --help
 The command above generates, for top *k* classes:
 * Vanilla backproped gradients
 * Guided backproped gradients
+* Deconvolved gradients
 * Grad-CAM
 * Guided Grad-CAM
 
@@ -39,8 +40,9 @@ For instance, off-the-shelf *inception_v3* cannot cut off negative gradients dur
 |:-:|:-:|:-:|:-:|
 |Probability|0.54285|0.19302|0.10428|
 |Grad-CAM [1]|![](results/bull_mastiff_gcam_resnet152.png)|![](results/tiger_cat_gcam_resnet152.png)|![](results/boxer_gcam_resnet152.png)|
-|Vanilla Backpropagation|![](results/bull_mastiff_bp_resnet152.png)|![](results/tiger_cat_bp_resnet152.png)|![](results/boxer_bp_resnet152.png)|
-|Guided Backpropagation [2]|![](results/bull_mastiff_gbp_resnet152.png)|![](results/tiger_cat_gbp_resnet152.png)|![](results/boxer_gbp_resnet152.png)|
+|Vanilla backpropagation|![](results/bull_mastiff_bp_resnet152.png)|![](results/tiger_cat_bp_resnet152.png)|![](results/boxer_bp_resnet152.png)|
+|"Deconvnet" [2]|![](results/bull_mastiff_deconv_resnet152.png)|![](results/tiger_cat_deconv_resnet152.png)|![](results/boxer_deconv_resnet152.png)|
+|Guided backpropagation [2]|![](results/bull_mastiff_gbp_resnet152.png)|![](results/tiger_cat_gbp_resnet152.png)|![](results/boxer_gbp_resnet152.png)|
 |Guided Grad-CAM [1]|![](results/bull_mastiff_ggcam_resnet152.png)|![](results/tiger_cat_ggcam_resnet152.png)|![](results/boxer_ggcam_resnet152.png)|
 
 Grad-CAM visualization of *bull mastiff*

@@ -61,6 +61,20 @@ class GuidedBackPropagation(BackPropagation):
             module[1].register_backward_hook(func_b)
 
 
+class Deconvolution(BackPropagation):
+
+    def __init__(self, model):
+        super(Deconvolution, self).__init__(model)
+
+        def func_b(module, grad_in, grad_out):
+            # Cut off negative gradients
+            if isinstance(module, nn.ReLU):
+                return (torch.clamp(grad_out[0], min=0.0),)
+
+        for module in self.model.named_modules():
+            module[1].register_backward_hook(func_b)
+
+
 class GradCAM(_PropagationBase):
 
     def __init__(self, model):

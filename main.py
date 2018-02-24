@@ -7,6 +7,8 @@
 
 from __future__ import print_function
 
+import copy
+
 import click
 import cv2
 import numpy as np
@@ -14,7 +16,8 @@ import torch
 from torch.autograd import Variable
 from torchvision import models, transforms
 
-from grad_cam import BackPropagation, GradCAM, GuidedBackPropagation
+from grad_cam import (BackPropagation, Deconvolution, GradCAM,
+                      GuidedBackPropagation)
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -26,8 +29,11 @@ def to_var(image):
 
 
 def save_gradient(filename, data):
-    abs_max = np.maximum(-1 * data.min(), data.max())
-    data = data / abs_max * 127.0 + 127.0
+    # abs_max = np.maximum(-1 * data.min(), data.max())
+    # data = data / abs_max * 127.0 + 127.0
+    data -= data.min()
+    data /= data.max()
+    data *= 255.0
     cv2.imwrite(filename, np.uint8(data))
 
 
@@ -103,7 +109,9 @@ def main(image_path, arch, topk, cuda):
         model.cuda()
         image = image.cuda()
 
+    # =========================================================================
     print('Grad-CAM')
+    # =========================================================================
     gcam = GradCAM(model=model)
     probs, idx = gcam.forward(to_var(image))
 
@@ -114,7 +122,9 @@ def main(image_path, arch, topk, cuda):
         save_gradcam('results/{}_gcam_{}.png'.format(classes[idx[i]], arch), output, raw_image)  # NOQA
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
+    # =========================================================================
     print('Vanilla Backpropagation')
+    # =========================================================================
     bp = BackPropagation(model=model)
     probs, idx = bp.forward(to_var(image))
 
@@ -125,7 +135,22 @@ def main(image_path, arch, topk, cuda):
         save_gradient('results/{}_bp_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
+    # =========================================================================
+    print('Deconvolution')
+    # =========================================================================
+    deconv = Deconvolution(model=copy.deepcopy(model)) # TODO: remove hook func in advance
+    probs, idx = deconv.forward(to_var(image))
+
+    for i in range(0, topk):
+        deconv.backward(idx=idx[i])
+        output = deconv.generate()
+
+        save_gradient('results/{}_deconv_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
+        print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
+
+    # =========================================================================
     print('Guided Backpropagation/Guided Grad-CAM')
+    # =========================================================================
     gbp = GuidedBackPropagation(model=model)
     probs, idx = gbp.forward(to_var(image))
 
