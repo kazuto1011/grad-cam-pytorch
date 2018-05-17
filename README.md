@@ -1,11 +1,12 @@
 # Grad-CAM with PyTorch
 
-PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping) [1]](##references). Grad-CAM localizes and highlights discriminative regions that convolutional neural networks-based models activate to predict visual concepts. This repo contains only an implementation for image classification models.
+PyTorch implementation of [Grad-CAM (Gradient-weighted Class Activation Mapping) [1]](##references). Grad-CAM localizes and highlights discriminative regions that convolutional neural networks-based models activate to predict visual concepts. This repository contains only implementation for image classification models.
+*Please checkout ```pytorch_0.3.1``` branch for pytorch 0.3.1*.
 
 ## Dependencies
 * Python 2.7
-* pytorch 0.3.1
-* torchvision 0.2.0
+* pytorch 0.4.0
+* torchvision 0.2.1
 * click
 * opencv
 

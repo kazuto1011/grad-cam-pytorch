@@ -18,9 +18,8 @@ from torchvision import models, transforms
 
 from grad_cam import (BackPropagation, Deconvolution, GradCAM, GuidedBackPropagation)
 
-
-def to_var(image):
-    return Variable(image.unsqueeze(0), volatile=False, requires_grad=True)
+# if model has LSTM
+# torch.backends.cudnn.enabled = False
 
 
 def save_gradient(filename, data):
@@ -76,7 +75,7 @@ def main(image_path, arch, topk, cuda):
         # Add your model
     }.get(arch)
 
-    cuda = cuda and torch.cuda.is_available()
+    device = torch.device('cuda' if cuda and torch.cuda.is_available() else 'cpu')
 
     if cuda:
         current_device = torch.cuda.current_device()
@@ -94,6 +93,8 @@ def main(image_path, arch, topk, cuda):
 
     # Model
     model = models.__dict__[arch](pretrained=True)
+    model.to(device)
+    model.eval()
 
     # Image
     raw_image = cv2.imread(image_path)[..., ::-1]
@@ -104,56 +105,52 @@ def main(image_path, arch, topk, cuda):
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225],
         )
-    ])(raw_image)
-
-    if cuda:
-        model.cuda()
-        image = image.cuda()
+    ])(raw_image).unsqueeze(0)
 
     # =========================================================================
     print('Grad-CAM')
     # =========================================================================
     gcam = GradCAM(model=model)
-    probs, idx = gcam.forward(to_var(image))
+    probs, idx = gcam.forward(image.to(device))
 
     for i in range(0, topk):
         gcam.backward(idx=idx[i])
         output = gcam.generate(target_layer=CONFIG['target_layer'])
 
-        save_gradcam('results/{}_gcam_{}.png'.format(classes[idx[i]], arch), output, raw_image)  # NOQA
+        save_gradcam('results/{}_gcam_{}.png'.format(classes[idx[i]], arch), output, raw_image)
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
     # =========================================================================
     print('Vanilla Backpropagation')
     # =========================================================================
     bp = BackPropagation(model=model)
-    probs, idx = bp.forward(to_var(image))
+    probs, idx = bp.forward(image.to(device))
 
     for i in range(0, topk):
         bp.backward(idx=idx[i])
         output = bp.generate()
 
-        save_gradient('results/{}_bp_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
+        save_gradient('results/{}_bp_{}.png'.format(classes[idx[i]], arch), output)
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
     # =========================================================================
     print('Deconvolution')
     # =========================================================================
     deconv = Deconvolution(model=copy.deepcopy(model))  # TODO: remove hook func in advance
-    probs, idx = deconv.forward(to_var(image))
+    probs, idx = deconv.forward(image.to(device))
 
     for i in range(0, topk):
         deconv.backward(idx=idx[i])
         output = deconv.generate()
 
-        save_gradient('results/{}_deconv_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
+        save_gradient('results/{}_deconv_{}.png'.format(classes[idx[i]], arch), output)
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
     # =========================================================================
     print('Guided Backpropagation/Guided Grad-CAM')
     # =========================================================================
     gbp = GuidedBackPropagation(model=model)
-    probs, idx = gbp.forward(to_var(image))
+    probs, idx = gbp.forward(image.to(device))
 
     for i in range(0, topk):
         gcam.backward(idx=idx[i])
@@ -166,8 +163,8 @@ def main(image_path, arch, topk, cuda):
         region = cv2.resize(region, (w, h))[..., np.newaxis]
         output = feature * region
 
-        save_gradient('results/{}_gbp_{}.png'.format(classes[idx[i]], arch), feature)  # NOQA
-        save_gradient('results/{}_ggcam_{}.png'.format(classes[idx[i]], arch), output)  # NOQA
+        save_gradient('results/{}_gbp_{}.png'.format(classes[idx[i]], arch), feature)
+        save_gradient('results/{}_ggcam_{}.png'.format(classes[idx[i]], arch), output)
         print('[{:.5f}] {}'.format(probs[i], classes[idx[i]]))
 
 

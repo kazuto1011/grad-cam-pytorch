@@ -16,22 +16,21 @@ from torch.nn import functional as F
 class _PropagationBase(object):
     def __init__(self, model):
         super(_PropagationBase, self).__init__()
-        self.cuda = True if next(model.parameters()).is_cuda else False
+        self.device = next(model.parameters()).device
         self.model = model
-        self.model.eval()
         self.image = None
 
     def _encode_one_hot(self, idx):
         one_hot = torch.FloatTensor(1, self.preds.size()[-1]).zero_()
         one_hot[0][idx] = 1.0
-        return one_hot.cuda() if self.cuda else one_hot
+        return one_hot.to(self.device)
 
     def forward(self, image):
-        self.image = image
+        self.image = image.requires_grad_()
         self.model.zero_grad()
         self.preds = self.model(self.image)
         self.probs = F.softmax(self.preds, dim=1)[0]
-        self.prob, self.idx = self.probs.data.sort(0, True)
+        self.prob, self.idx = self.probs.sort(0, True)
         return self.prob, self.idx
 
     def backward(self, idx):
@@ -41,8 +40,8 @@ class _PropagationBase(object):
 
 class BackPropagation(_PropagationBase):
     def generate(self):
-        output = self.image.grad.data.cpu().numpy()[0]
-        return output.transpose(1, 2, 0)
+        output = self.image.grad.detach().cpu().numpy()
+        return output.transpose(0, 2, 3, 1)[0]
 
 
 class GuidedBackPropagation(BackPropagation):
@@ -78,10 +77,10 @@ class GradCAM(_PropagationBase):
         self.all_grads = OrderedDict()
 
         def func_f(module, input, output):
-            self.all_fmaps[id(module)] = output.data.cpu()
+            self.all_fmaps[id(module)] = output.detach()
 
         def func_b(module, grad_in, grad_out):
-            self.all_grads[id(module)] = grad_out[0].cpu()
+            self.all_grads[id(module)] = grad_out[0].detach()
 
         for module in self.model.named_modules():
             module[1].register_forward_hook(func_f)
@@ -97,7 +96,7 @@ class GradCAM(_PropagationBase):
 
     def _normalize(self, grads):
         l2_norm = torch.sqrt(torch.mean(torch.pow(grads, 2))) + 1e-5
-        return grads / l2_norm.data[0]
+        return grads / l2_norm
 
     def _compute_grad_weights(self, grads):
         grads = self._normalize(grads)
@@ -108,10 +107,10 @@ class GradCAM(_PropagationBase):
         grads = self._find(self.all_grads, target_layer)
         weights = self._compute_grad_weights(grads)
 
-        gcam = (fmaps[0] * weights[0].data).sum(dim=0)
+        gcam = (fmaps[0] * weights[0]).sum(dim=0)
         gcam = torch.clamp(gcam, min=0.)
 
         gcam -= gcam.min()
         gcam /= gcam.max()
 
-        return gcam.cpu().numpy()
+        return gcam.detach().cpu().numpy()
