@@ -16,12 +16,7 @@ import torch
 from torch.autograd import Variable
 from torchvision import models, transforms
 
-from grad_cam import (BackPropagation, Deconvolution, GradCAM,
-                      GuidedBackPropagation)
-
-model_names = sorted(name for name in models.__dict__
-                     if name.islower() and not name.startswith("__")
-                     and callable(models.__dict__[name]))
+from grad_cam import (BackPropagation, Deconvolution, GradCAM, GuidedBackPropagation)
 
 
 def to_var(image):
@@ -29,8 +24,6 @@ def to_var(image):
 
 
 def save_gradient(filename, data):
-    # abs_max = np.maximum(-1 * data.min(), data.max())
-    # data = data / abs_max * 127.0 + 127.0
     data -= data.min()
     data /= data.max()
     data *= 255.0
@@ -46,10 +39,16 @@ def save_gradcam(filename, gcam, raw_image):
     cv2.imwrite(filename, np.uint8(gcam))
 
 
+model_names = sorted(
+    name for name in models.__dict__
+    if name.islower() and not name.startswith("__") and callable(models.__dict__[name])
+)
+
+
 @click.command()
-@click.option('--image-path', type=str, required=True)
-@click.option('--arch', type=click.Choice(model_names), required=True)
-@click.option('--topk', type=int, default=3)
+@click.option('-i', '--image-path', type=str, required=True)
+@click.option('-a', '--arch', type=click.Choice(model_names), required=True)
+@click.option('-k', '--topk', type=int, default=3)
 @click.option('--cuda/--no-cuda', default=True)
 def main(image_path, arch, topk, cuda):
 
@@ -101,8 +100,10 @@ def main(image_path, arch, topk, cuda):
     raw_image = cv2.resize(raw_image, (CONFIG['input_size'], ) * 2)
     image = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
+        )
     ])(raw_image)
 
     if cuda:
@@ -138,7 +139,7 @@ def main(image_path, arch, topk, cuda):
     # =========================================================================
     print('Deconvolution')
     # =========================================================================
-    deconv = Deconvolution(model=copy.deepcopy(model)) # TODO: remove hook func in advance
+    deconv = Deconvolution(model=copy.deepcopy(model))  # TODO: remove hook func in advance
     probs, idx = deconv.forward(to_var(image))
 
     for i in range(0, topk):

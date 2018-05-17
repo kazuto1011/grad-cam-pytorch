@@ -14,7 +14,6 @@ from torch.nn import functional as F
 
 
 class _PropagationBase(object):
-
     def __init__(self, model):
         super(_PropagationBase, self).__init__()
         self.cuda = True if next(model.parameters()).is_cuda else False
@@ -41,42 +40,38 @@ class _PropagationBase(object):
 
 
 class BackPropagation(_PropagationBase):
-
     def generate(self):
         output = self.image.grad.data.cpu().numpy()[0]
         return output.transpose(1, 2, 0)
 
 
 class GuidedBackPropagation(BackPropagation):
-
     def __init__(self, model):
         super(GuidedBackPropagation, self).__init__(model)
 
         def func_b(module, grad_in, grad_out):
             # Cut off negative gradients
             if isinstance(module, nn.ReLU):
-                return (torch.clamp(grad_in[0], min=0.0),)
+                return (torch.clamp(grad_in[0], min=0.0), )
 
         for module in self.model.named_modules():
             module[1].register_backward_hook(func_b)
 
 
 class Deconvolution(BackPropagation):
-
     def __init__(self, model):
         super(Deconvolution, self).__init__(model)
 
         def func_b(module, grad_in, grad_out):
             # Cut off negative gradients
             if isinstance(module, nn.ReLU):
-                return (torch.clamp(grad_out[0], min=0.0),)
+                return (torch.clamp(grad_out[0], min=0.0), )
 
         for module in self.model.named_modules():
             module[1].register_backward_hook(func_b)
 
 
 class GradCAM(_PropagationBase):
-
     def __init__(self, model):
         super(GradCAM, self).__init__(model)
         self.all_fmaps = OrderedDict()
