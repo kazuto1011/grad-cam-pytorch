@@ -15,7 +15,7 @@ from torch.nn import functional as F
 
 class _BaseWrapper(object):
     """
-    Please modify forward() and backward() depending on your task.
+    Please modify forward() and backward() according to your task.
     """
 
     def __init__(self, model):
@@ -24,10 +24,10 @@ class _BaseWrapper(object):
         self.model = model
         self.handlers = []  # a set of hook function handlers
 
-    def _encode_one_hot(self, idx):
-        one_hot = torch.zeros((1, self.logits.size()[-1])).float()
-        one_hot[0][idx] = 1.0
-        return one_hot.to(self.device)
+    def _encode_one_hot(self, ids):
+        one_hot = torch.zeros_like(self.logits).to(self.device)
+        one_hot.scatter_(1, ids, 1.0)
+        return one_hot
 
     def forward(self, image):
         """
@@ -35,20 +35,19 @@ class _BaseWrapper(object):
         """
         self.model.zero_grad()
         self.logits = self.model(image)
-        self.probs = F.softmax(self.logits, dim=1)[0]
-        return list(zip(*self.probs.sort(0, True)))  # element: (probability, index)
+        self.probs = F.softmax(self.logits, dim=1)
+        return self.probs.sort(dim=1, descending=True)
 
-    def backward(self, idx):
+    def backward(self, ids):
         """
         Class-specific backpropagation
 
         Either way works:
         1. self.logits.backward(gradient=one_hot, retain_graph=True)
-        2. self.logits[:, idx].backward(retain_graph=True)
-        3. (self.logits * one_hot).sum().backward(retain_graph=True)
+        2. (self.logits * one_hot).sum().backward(retain_graph=True)
         """
 
-        one_hot = self._encode_one_hot(idx)
+        one_hot = self._encode_one_hot(ids)
         self.logits.backward(gradient=one_hot, retain_graph=True)
 
     def generate(self):
@@ -68,9 +67,9 @@ class BackPropagation(_BaseWrapper):
         return super().forward(self.image)
 
     def generate(self):
-        gradient = self.image.grad.cpu().clone().numpy()
+        gradient = self.image.grad.clone()
         self.image.grad.zero_()
-        return gradient.transpose(0, 2, 3, 1)[0]
+        return gradient
 
 
 class GuidedBackPropagation(BackPropagation):
@@ -118,11 +117,11 @@ class GradCAM(_BaseWrapper):
     Look at Figure 2 on page 4
     """
 
-    def __init__(self, model, candidate_layers=[]):
+    def __init__(self, model, candidate_layers=None):
         super(GradCAM, self).__init__(model)
         self.fmap_pool = OrderedDict()
         self.grad_pool = OrderedDict()
-        self.candidate_layers = candidate_layers
+        self.candidate_layers = candidate_layers  # list
 
         def forward_hook(module, input, output):
             # Save featuremaps
@@ -134,7 +133,7 @@ class GradCAM(_BaseWrapper):
 
         # If any candidates are not specified, the hook is registered to all the layers.
         for module in self.model.named_modules():
-            if len(self.candidate_layers) == 0 or module[0] in self.candidate_layers:
+            if self.candidate_layers is None or module[0] in self.candidate_layers:
                 self.handlers.append(module[1].register_forward_hook(forward_hook))
                 self.handlers.append(module[1].register_backward_hook(backward_hook))
 
@@ -154,15 +153,23 @@ class GradCAM(_BaseWrapper):
         grads = self._normalize(grads)
         return F.adaptive_avg_pool2d(grads, 1)
 
+    def forward(self, image):
+        self.image_shape = image.shape[2:]
+        return super().forward(image)
+
     def generate(self, target_layer):
         fmaps = self._find(self.fmap_pool, target_layer)
         grads = self._find(self.grad_pool, target_layer)
         weights = self._compute_grad_weights(grads)
 
-        gcam = (fmaps[0] * weights[0]).sum(dim=0)
+        gcam = torch.mul(fmaps, weights).sum(dim=1, keepdim=True)
         gcam = torch.clamp(gcam, min=0.0)
+
+        gcam = F.interpolate(
+            gcam, self.image_shape, mode="bilinear", align_corners=False
+        )
 
         gcam -= gcam.min()
         gcam /= gcam.max()
 
-        return gcam.cpu().numpy()
+        return gcam
