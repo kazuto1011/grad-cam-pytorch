@@ -9,17 +9,17 @@ PyTorch implementation of Grad-CAM (Gradient-weighted Class Activation Mapping) 
 * click
 * opencv
 
-## Usage
+## Basic usage
 
 ```sh
-python demo.py --help
+python main.py demo1 --help
 ```
 
-* ```-i```, ```--image-path```: a path to an image (required)
+* ```-i```, ```--image-paths```: image path, which can be provided multiple times (required)
 * ```-a```, ```--arch```: a model name from ```torchvision.models```, e.g. "resnet152" (required)
 * ```-t```, ```--target-layer```: a layer to be visualized, e.g. "layer4.2" (required)
 * ```-k```, ```--topk```: the number of classes to generate (default: 3)
-* ```--cuda/--no-cuda```: GPU or CPU
+* ```--cuda/--cpu```: GPU or CPU
 
 The command above generates, for top *k* classes:
 
@@ -36,48 +36,65 @@ For instance, off-the-shelf *inception_v3* cannot cut off negative gradients dur
 
 ![](samples/cat_dog.png)
 
-### Demo
+### Demo 1
+
+Generate all kinds of visualization maps given a torchvision model, a target layer, and images.
 
 ```bash
-python demo.py -a resnet152 \
-               -t layer4 \
-               -i samples/cat_dog.png
+python main.py demo1 -a resnet152 \
+                     -t layer4 \
+                     -i samples/cat_dog.png
 ```
 
-|                   Method                   |                         bull mastiff                          |                         tiger cat                          |                         boxer                          |
-| :----------------------------------------: | :-----------------------------------------------------------: | :--------------------------------------------------------: | :----------------------------------------------------: |
-|                Probability                 |                            0.54285                            |                          0.19302                           |                        0.10428                         |
-|        Grad-CAM [[1](##references)]        |    ![](results/resnet152-gradcam-layer4-bull_mastiff.png)     |    ![](results/resnet152-gradcam-layer4-tiger_cat.png)     |    ![](results/resnet152-gradcam-layer4-boxer.png)     |
-|          Vanilla backpropagation           |        ![](results/resnet152-vanilla-bull_mastiff.png)        |        ![](results/resnet152-vanilla-tiger_cat.png)        |        ![](results/resnet152-vanilla-boxer.png)        |
-|      "Deconvnet" [[2](##references)]       |       ![](results/resnet152-deconvnet-bull_mastiff.png)       |       ![](results/resnet152-deconvnet-tiger_cat.png)       |       ![](results/resnet152-deconvnet-boxer.png)       |
-| Guided backpropagation [[2](##references)] |        ![](results/resnet152-guided-bull_mastiff.png)         |        ![](results/resnet152-guided-tiger_cat.png)         |        ![](results/resnet152-guided-boxer.png)         |
-|    Guided Grad-CAM [[1](##references)]     | ![](results/resnet152-guided_gradcam-layer4-bull_mastiff.png) | ![](results/resnet152-guided_gradcam-layer4-tiger_cat.png) | ![](results/resnet152-guided_gradcam-layer4-boxer.png) |
-
-### Grad-CAM with different models for "bull mastiff" class
+You can specify multiple images like:
 
 ```bash
-python demo.py -a <model name> \
-               -t <layer name> \
-               -i samples/cat_dog.png
+python main.py demo1 -a resnet152 \
+                     -t layer4 \
+                     -i samples/cat_dog.png \
+                     -i samples/vegetables.jpg
 ```
 
-|            Model             |                    ```resnet152```                     |                     ```vgg19```                      |                     ```vgg19_bn```                      |                     ```densenet201```                      |                     ```squeezenet1_1```                      |
-| :--------------------------: | :----------------------------------------------------: | :--------------------------------------------------: | :-----------------------------------------------------: | :--------------------------------------------------------: | :----------------------------------------------------------: |
-|            Layer*            |                      ```layer4```                      |                    ```features```                    |                     ```features```                      |                       ```features```                       |                        ```features```                        |
-| Grad-CAM [[1](##references)] | ![](results/resnet152-gradcam-layer4-bull_mastiff.png) | ![](results/vgg19-gradcam-features-bull_mastiff.png) | ![](results/vgg19_bn-gradcam-features-bull_mastiff.png) | ![](results/densenet201-gradcam-features-bull_mastiff.png) | ![](results/squeezenet1_1-gradcam-features-bull_mastiff.png) |
+|              Predicted class               |                         #1 bull mastiff                         |                         #2 tiger cat                         |                         #3 boxer                         |
+| :----------------------------------------: | :-------------------------------------------------------------: | :----------------------------------------------------------: | :------------------------------------------------------: |
+|        Grad-CAM [[1](##references)]        |    ![](results/0-resnet152-gradcam-layer4-bull_mastiff.png)     |    ![](results/0-resnet152-gradcam-layer4-tiger_cat.png)     |    ![](results/0-resnet152-gradcam-layer4-boxer.png)     |
+|          Vanilla backpropagation           |        ![](results/0-resnet152-vanilla-bull_mastiff.png)        |        ![](results/0-resnet152-vanilla-tiger_cat.png)        |        ![](results/0-resnet152-vanilla-boxer.png)        |
+|      "Deconvnet" [[2](##references)]       |       ![](results/0-resnet152-deconvnet-bull_mastiff.png)       |       ![](results/0-resnet152-deconvnet-tiger_cat.png)       |       ![](results/0-resnet152-deconvnet-boxer.png)       |
+| Guided backpropagation [[2](##references)] |        ![](results/0-resnet152-guided-bull_mastiff.png)         |        ![](results/0-resnet152-guided-tiger_cat.png)         |        ![](results/0-resnet152-guided-boxer.png)         |
+|    Guided Grad-CAM [[1](##references)]     | ![](results/0-resnet152-guided_gradcam-layer4-bull_mastiff.png) | ![](results/0-resnet152-guided_gradcam-layer4-tiger_cat.png) | ![](results/0-resnet152-guided_gradcam-layer4-boxer.png) |
+
+Grad-CAM with different models for "bull mastiff" class
+
+|            Model             |                     ```resnet152```                      |                      ```vgg19```                       |                      ```vgg19_bn```                       |                      ```densenet201```                       |                      ```squeezenet1_1```                       |
+| :--------------------------: | :------------------------------------------------------: | :----------------------------------------------------: | :-------------------------------------------------------: | :----------------------------------------------------------: | :------------------------------------------------------------: |
+|            Layer*            |                       ```layer4```                       |                     ```features```                     |                      ```features```                       |                        ```features```                        |                         ```features```                         |
+| Grad-CAM [[1](##references)] | ![](results/0-resnet152-gradcam-layer4-bull_mastiff.png) | ![](results/0-vgg19-gradcam-features-bull_mastiff.png) | ![](results/0-vgg19_bn-gradcam-features-bull_mastiff.png) | ![](results/0-densenet201-gradcam-features-bull_mastiff.png) | ![](results/0-squeezenet1_1-gradcam-features-bull_mastiff.png) |
 
 \* PyTorch module name
 
-### Grad-CAM at different layers of resnet152 for "bull mastiff" class
+### Demo 2
+
+Generate Grad-CAM at different layers of resnet152 for "bull mastiff" class.
 
 ```bash
-python demo2.py --image-path samples/cat_dog.png
+python main.py demo2 -i samples/cat_dog.png
 ```
 
-|            Layer*            |                      ```layer1```                      |                      ```layer2```                      |                      ```layer3```                      |                      ```layer4```                      |
-| :--------------------------: | :----------------------------------------------------: | :----------------------------------------------------: | :----------------------------------------------------: | :----------------------------------------------------: |
-| Grad-CAM [[1](##references)] | ![](results/resnet152-gradcam-layer1-bull_mastiff.png) | ![](results/resnet152-gradcam-layer2-bull_mastiff.png) | ![](results/resnet152-gradcam-layer3-bull_mastiff.png) | ![](results/resnet152-gradcam-layer4-bull_mastiff.png) |
+|            Layer*            |                       ```layer1```                       |                       ```layer2```                       |                       ```layer3```                       |                       ```layer4```                       |
+| :--------------------------: | :------------------------------------------------------: | :------------------------------------------------------: | :------------------------------------------------------: | :------------------------------------------------------: |
+| Grad-CAM [[1](##references)] | ![](results/0-resnet152-gradcam-layer1-bull_mastiff.png) | ![](results/0-resnet152-gradcam-layer2-bull_mastiff.png) | ![](results/0-resnet152-gradcam-layer3-bull_mastiff.png) | ![](results/0-resnet152-gradcam-layer4-bull_mastiff.png) |
 
+### Demo 3
+
+Generate Grad-CAM with the original models. Here we use Xception v1 from my other repo and visualize at the last convolution layer (see `demo3()` for more details).
+
+```bash
+python main.py demo3 -i samples/cat_dog.png
+```
+
+|       Predicted class        |                           #1 bull mastiff                           |                           #2 tiger cat                           |                           #3 boxer                           |
+| :--------------------------: | :-----------------------------------------------------------------: | :--------------------------------------------------------------: | :----------------------------------------------------------: |
+| Grad-CAM [[1](##references)] | ![](results/0-xception_v1-gradcam-exit_flow.conv4-bull_mastiff.png) | ![](results/0-xception_v1-gradcam-exit_flow.conv4-tiger_cat.png) | ![](results/0-xception_v1-gradcam-exit_flow.conv4-boxer.png) |
 
 ## References
 
