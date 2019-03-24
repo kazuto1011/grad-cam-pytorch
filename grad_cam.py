@@ -169,7 +169,10 @@ class GradCAM(_BaseWrapper):
             gcam, self.image_shape, mode="bilinear", align_corners=False
         )
 
-        gcam -= gcam.min()
-        gcam /= gcam.max()
+        B, C, H, W = gcam.shape
+        gcam = gcam.view(B, -1)
+        gcam -= gcam.min(dim=1, keepdim=True)[0]
+        gcam /= gcam.max(dim=1, keepdim=True)[0]
+        gcam = gcam.view(B, C, H, W)
 
         return gcam
