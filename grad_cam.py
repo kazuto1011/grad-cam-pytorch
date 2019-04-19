@@ -65,7 +65,7 @@ class _BaseWrapper(object):
 class BackPropagation(_BaseWrapper):
     def forward(self, image):
         self.image = image.requires_grad_()
-        return super().forward(self.image)
+        return super(BackPropagation, self).forward(self.image)
 
     def generate(self):
         gradient = self.image.grad.clone()
@@ -151,7 +151,7 @@ class GradCAM(_BaseWrapper):
 
     def forward(self, image):
         self.image_shape = image.shape[2:]
-        return super().forward(image)
+        return super(GradCAM, self).forward(image)
 
     def generate(self, target_layer):
         fmaps = self._find(self.fmap_pool, target_layer)
