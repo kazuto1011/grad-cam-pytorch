@@ -124,27 +124,31 @@ class GradCAM(_BaseWrapper):
         self.grad_pool = OrderedDict()
         self.candidate_layers = candidate_layers  # list
 
-        def forward_hook(module, input, output):
-            # Save featuremaps
-            self.fmap_pool[id(module)] = output.detach()
+        def forward_hook(key):
+            def forward_hook_(module, input, output):
+                # Save featuremaps
+                self.fmap_pool[key] = output.detach()
 
-        def backward_hook(module, grad_in, grad_out):
-            # Save the gradients correspond to the featuremaps
-            self.grad_pool[id(module)] = grad_out[0].detach()
+            return forward_hook_
+
+        def backward_hook(key):
+            def backward_hook_(module, grad_in, grad_out):
+                # Save the gradients correspond to the featuremaps
+                self.grad_pool[key] = grad_out[0].detach()
+
+            return backward_hook_
 
         # If any candidates are not specified, the hook is registered to all the layers.
-        for module in self.model.named_modules():
-            if self.candidate_layers is None or module[0] in self.candidate_layers:
-                self.handlers.append(module[1].register_forward_hook(forward_hook))
-                self.handlers.append(module[1].register_backward_hook(backward_hook))
+        for name, module in self.model.named_modules():
+            if self.candidate_layers is None or name in self.candidate_layers:
+                self.handlers.append(module.register_forward_hook(forward_hook(name)))
+                self.handlers.append(module.register_backward_hook(backward_hook(name)))
 
     def _find(self, pool, target_layer):
-        for key, value in pool.items():
-            for module in self.model.named_modules():
-                if id(module[1]) == key:
-                    if module[0] == target_layer:
-                        return value
-        raise ValueError("Invalid layer name: {}".format(target_layer))
+        if target_layer in pool.keys():
+            return pool[target_layer]
+        else:
+            raise ValueError("Invalid layer name: {}".format(target_layer))
 
     def _compute_grad_weights(self, grads):
         return F.adaptive_avg_pool2d(grads, 1)
