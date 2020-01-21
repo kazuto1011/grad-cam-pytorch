@@ -7,7 +7,7 @@ PyTorch implementation of Grad-CAM (Gradient-weighted Class Activation Mapping) 
 Python 2.7 / 3.+
 
 ```bash
-$ pip install click opencv-python matplotlib
+$ pip install click opencv-python matplotlib tqdm numpy
 $ pip install "torch>=0.4.1" torchvision
 ```
 
